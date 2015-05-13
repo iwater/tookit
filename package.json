@@ -1,6 +1,6 @@
 {
   "name": "toolkit",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -9,6 +9,7 @@
   "author": "iwater@gmail.com",
   "license": "ISC",
   "dependencies": {
-    "mysql": ">=2.6.2"
+    "mysql": ">=2.6.2",
+    "co": "*"
   }
 }

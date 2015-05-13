@@ -1,3 +1,4 @@
+var co = require('co');
 var mysql = require('mysql');
 
 var getFirst = function (rows) {
@@ -5,8 +6,6 @@ var getFirst = function (rows) {
     var row = rows[0];
     var key = Object.keys(row)[0];
     return row[key];
-  } else {
-    throw('NO DATA');
   }
 };
 
@@ -17,18 +16,42 @@ var getFirstRow = function (rows) {
 exports.createPool = function (options) {
   var pool = mysql.createPool(options);
 
-  pool.on('connection', function (connection) {
-    connection.query("SET SESSION time_zone ='+8:00'");
+  pool.on('error', function (e) {
+    console.log(e.stack);
+    console.log(options);
   });
 
-  var query = function (sql, args) {
+  var getConnection = function (pool) {
     return new Promise(function (resolve, reject) {
-      pool.query(sql, args, function (err, rows) {
-        if(err) reject(err);
-        else resolve(rows);
+      pool.getConnection(function(err, connection) {
+        err ? reject(err) : resolve(connection);
       });
     });
   };
+
+  var querySerial = co.wrap(function*(queries) {
+    var conn = yield getConnection(pool);
+    var query = queryFactory(conn);
+    var results = [];
+    for(var i = 0; i < queries.length; i++) {
+      results.push(yield query(queries[i].sql, queries[i].args));
+    }
+    conn.release();
+    return results;
+  });
+
+  var queryFactory = function (pool) {
+    return function (sql, args) {
+      return new Promise(function (resolve, reject) {
+        pool.query(sql, args, function (err, rows) {
+          if(err) reject(err);
+          else resolve(rows);
+        });
+      });
+    };
+  };
+
+  var query = queryFactory(pool);
 
   var queryOne = function (sql, args) {
     return query(sql, args).then(getFirst);
@@ -54,6 +77,7 @@ exports.createPool = function (options) {
     query: query,
     queryOne: queryOne,
     queryObject: queryObject,
+    querySerial: querySerial,
     executeInsert: executeInsert,
     executeUpdate: executeUpdate
   };
